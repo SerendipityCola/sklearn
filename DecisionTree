@@ -1,0 +1,92 @@
+#sklearn基本建模流程
+#1.实例化，监理评估模型对象
+#2.通过模型接口训练模型
+#3.通过模型接口提取需要的信息
+
+#决策树的基本流程
+#1.计算全部特征的不纯度指标
+#2.选取不纯度指标最优的特征进行分枝
+#3.在第一个特征的分枝下再次计算全部特征的不纯度指标
+#4.选取不纯度指标最优的特征进行分枝
+#...
+#5.直到没有更多的特征可用，或整体的不纯度指标已经最优，决策树就会停止生长
+
+
+# sklearn.tree包含的五个类
+# 1.分类树：tree.DecisionTreeClassiﬁer
+# 2.回归树：tree.DecisionTreeRegressor
+# 3.将生成的决策树导出为DOT格式（画图专用）：tree.export_graphviz
+# 4.高随机版本的分类树：tree.ExtraTreeClassiﬁer
+# 5.高随机版本的回归树：tree.ExtraTreeRegressor
+
+# 重要参数：
+# 1.Criterion（决定不纯度的计算方法）：1）entropy（信息熵）  2）Gini Impurity（基尼系数）
+# 选取标准:1)通常就使用基尼系数 2)数据维度、噪音很大时用基尼系数 3)维度低数据比较清晰时二者均可 4）决策树的拟合程度不够时用信息熵 5）两个都试试不好就换
+# 2.random_state：设置随机模式，默认none，输入任意整数会一直长出同一棵树让模型稳定下来，准确度不再变化
+# 3.splitter：也是控制随机选项的，默认best也会是随机的但是会选择更重要的进行分枝，输random会更加随机，降低拟合
+# 五个用来剪枝的参数（通常1+2/3使用）
+# 1.max_depth:限制树的最大深度，超过设定值的树枝全部剪掉,。使用时建议从=3开始尝试，看看拟合的效果再决定是否增加设定深度
+# 2.min_samples_leaf:一个节点在分枝后的每个子节点都必须包含至少m个训练样本，否则不分枝，或者朝着满足该条件的方向分枝，一般搭配max_depth使用（一般从5开始）
+# 3.min_samples_split：一个节点必须要包含至少m个训练样本否则不分枝
+# 4.max_features：限制分枝时考虑的特征个数，超过限制个数的特征都会被舍弃，不知道每个特征重要性时强行使用会导致模型学习不足
+# 5.min_impurity_decrease：限制信息增益的大小，信息增益小于设定数值不分枝
+
+##################代码##################
+#倒入需要的模块
+from sklearn import tree #树模型
+from sklearn.datasets import load_wine  #一个可以生成数据集的库，使用红酒数据
+from sklearn.model_selection import train_test_split  #分训练集和测试集的模块 训练_测试_划分 模块
+import pandas as pd
+import graphviz
+
+# 探索数据
+wine = load_wine()  #导入红酒数据，是字典的形式
+# print(wine.data)   #查看数据
+# print(wine.target)
+# 把数据和标签都变成两张表然后横向连接
+df = pd.concat([pd.DataFrame(wine.data),pd.DataFrame(wine.target)],axis=1)
+# print(df)
+# print(wine.feature_names)  #查看特征的名字
+# print(wine.target_names)  #查看标签的名字
+
+# 分训练集和测试集
+# 三个参数：特征，标签，测试样本的尺寸（30%测试集，70%训练集）
+Xtrain,Xtest,Ytrain,Ytest = train_test_split(wine.data,wine.target,test_size=0.3)
+# print(Xtrain.shape)  #查看训练集特征数量和标签数量
+
+#实例化
+clf = tree.DecisionTreeClassifier(criterion="entropy",random_state=0,splitter="random")
+clf = clf.fit(Xtrain,Ytrain)  #执行训练，放入已经分好的训练集
+score = clf.score(Xtest,Ytest)  #对模型精确度的衡量，返回预测的准确度
+print(score)  #多次运行会不一样，因为测试集和训练集不一样，train_test_split是随机划分的
+# 如果训练集拟合程度很高，测试集拟合程度并不好，则过拟合
+score_train = clf.score(Xtrain,Ytrain)  #返回训练集的拟合程度
+print(score_train)
+score_test = clf.score(Xtest,Ytest)   #返回测试集的拟合程度
+print(score_test)
+
+# print(clf.feature_importances_)  #查看特征重要性，数值越大约有意义，去掉没有意义的对决策树没有影响
+# print(*zip(feature_name,clf.feature_importances_))  #把特征名称和重要性合并查看
+
+#确认最优的剪枝参数
+# 超参数的学习曲线：以超参数的取值为横坐标，模型的度量指标为纵坐标，用来衡量不同超参数取值下模型的表现的线
+import matplotlib.pyplot as plt
+test = []
+for i in range(10):
+    clf = tree.DecisionTreeClassifier(max_depth=i+1,criterion="entropy",random_state=0,splitter="random")
+    clf = clf.fit(Xtrain, Ytrain)
+    score = clf.score(Xtest, Ytest)
+    test.append(score)
+plt.plot(range(1,11),test,c="r",label="max_depth")
+plt.legend()
+plt.show()
+
+#画决策树（要用graphviz模块）
+feature_name =  ['酒精','苹果酸','灰','灰的碱性','镁','总酚','类黄酮','非黄烷类酚类','花青素','颜 色强度','色调','od280/od315稀释葡萄酒','脯氨酸']  #摄制特征名称
+dot_data = tree.export_graphviz(clf,  #倒入训练模型
+                                feature_names=feature_name,  #导入已设定好的特征名字，如果没有feature则生成的图只会显示相应的索引号
+                                class_names=["琴酒","雪梨","贝尔摩德"],  #设置标签名字，如果没有classname则图中没有类别名
+                                filled=True,  #进行颜色填充，用颜色标识不同的分类，颜色越浅不纯度越高
+                                rounded=True)  #节点边框是否圆滑
+graph = graphviz.Source(dot_data)  #生成一棵树
+# graph.render()  #生成决策树图片
