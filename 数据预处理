@@ -1,0 +1,157 @@
+# 数据挖掘的五大流程：
+# 1.数据预处理：从数据中检测，纠正或删除损坏，不准确或不适用于模型（比如数据类型不同、质量不好）的记录（目的：使数据更好地适应模型，匹配模型的需求）
+# 2.特征工程：将原始数据转换为更能代表预测模型的潜在问题的特征（目的：降低计算成本，提升模型上限）
+# 3.建模并预测结果
+# 4.上线，验证模型效果
+
+# 数据的无量纲化——将不同规格的数据转换到同一规格，或不同分布的数据转换到某个特定分布
+# 1）中心化（线性）：让所有记录减去一个固定值，即让数据样本数据平移到某个位置，包括Zero-centered、Meansubtraction（中心化只需要pandas广播一下减去某个数就好了，因此sklearn不提供任何中心化功能）
+# 2）缩放处理（非线性）：是通过除以一个固定值，将数据固定在某个范围之中，取对数也算是一种缩放处理
+
+######################### 数据归一化（preprocessing.MinMaxScaler）#######################
+# 重要参数feature_range控制希望把数据压缩到的范围，默认是[0,1]
+from sklearn.preprocessing import MinMaxScaler
+import pandas as pd
+
+data = [[-1,2],[-0.5,6],[0,10],[1,18]]
+# print(pd.DataFrame(data))
+scaler = MinMaxScaler()
+# scaler = scaler.fit(data)    #训练，生成min和max
+# result = scaler.transform(data)    #通过接口导出结果
+result = scaler.fit_transform(data)  #训练和导出结果一步达成，与前两步效果一样
+# print(result)
+result1 = scaler.inverse_transform(result)    #将归一化后的结果逆转
+# print(result1)
+
+# 调整参数feature_range实现将数据归一化到[0,1]以外的范围
+scaler = MinMaxScaler(feature_range=[5,10])
+result2 = scaler.fit_transform(data)
+print(result2)
+# 当特征数量过多时fit会报错，此时需要把fit换成partial_fit且不能和transform联合使用
+
+# numpy实现归一化
+import numpy as np
+X = np.array([[-1,2],[-0.5,6],[0,10],[1,18]])
+print(X)
+# 归一化
+X_nor = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
+print(X_nor)
+# 逆转归一化
+X_returned = X_nor * (X.max(axis=0) - X.min(axis=0)) + X.min(axis=0)
+print(X_returned)
+
+
+############################### 数据标准化（Standardization）#######################
+# 数据减均值除以标准差
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+result3 = scaler.fit_transform(data)
+print(scaler.mean_)  #查看均值
+print(scaler.var_)   #查看方差
+print(result3)
+print(result3.mean())   #查看标准化后的均值
+print(result3.std())   #查看标准化后的方差
+result3_ = scaler.inverse_transform(result3)   #逆转标准化
+print(result3_)
+
+#对于StandardScaler和MinMaxScaler来说，空值NaN会被当做是缺失值，在ﬁt的时候忽略，transform时保持缺失NaN，ﬁt接口中只允许导入至少二维数组，一维数组导入会报错
+############StandardScaler与MinMaxScaler的选择##################3
+# 大多数机器学习算法中StandardScalerr往往是最好的选择，因为MinMaxScaler对异常值非常敏感。
+# MinMaxScaler在不涉及距离度量、梯度、协方差计算以及数据需要被压缩到特定区间时使用广泛，比如数字图像处理中量化像素强度
+# 建议先试试看StandardScaler，效果不好换MinMaxScaler
+
+
+################################# 缺失值的处理（仅一个库：impute.SimpleImputer ）#############################
+# 四个重要参数
+# 1.missing_values：告诉SimpleImputer，数据中的缺失值长什么样，默认空值np.nan
+# 2.strategy：填补缺失值的策略，mean——填补均值，median——填补中值，most_frequent——填补众数，constant——填补参考数
+# 3.fill_value：当参数startegy为”constant"的时候可用，可输入字符串或数字表示要填充的值，常用0
+# 4.copy：默认为True，将创建特征矩阵的副本，反之则会将缺失值填补到原本的特征矩阵中去
+import pandas as pd
+from sklearn.impute import SimpleImputer
+data = pd.read_csv(r"E:\Learning\python\机器学习\data\Narrativedata.csv",index_col=0)  #如果不设置index_col=0则会把数据表的索引列作为第一列数据
+# print(data.info())  # 填补年龄
+Age = data.loc[:, "Age"].values.reshape(-1, 1)  # sklearn当中特征矩阵必须是二维,用reshape（-1,1）转换
+# print(Age)
+# 实例化填补模型
+imp_mean = SimpleImputer()  #默认均值填补
+imp_median = SimpleImputer(strategy="median")    #用中位数填补
+imp_0 = SimpleImputer(strategy="constant",fill_value=0) #用0填补
+# fit_transform一步完成调取结果
+imp_mean = imp_mean.fit_transform(Age)
+imp_median = imp_median.fit_transform(Age)
+imp_0 = imp_0.fit_transform(Age)
+# 在这里我们使用中位数填补Age
+data.loc[:,"Age"] = imp_median
+# print(data.info())
+# 使用众数填补Embarked(字符型)
+Embarked = data.loc[:,"Embarked"].values.reshape(-1,1)
+imp_most = SimpleImputer(strategy="most_frequent")
+data.loc[:,"Embarked"] = imp_most.fit_transform(Embarked)
+print(data.head())
+
+
+#################用numpy和pandas进行数据填补#######################
+data.loc[:,"Age"] = data.loc[:,"Age"].fillna(data.loc[:,"Age"].median())    #.fillna 在DataFrame里面直接进行填补
+data.dropna(axis=0,inplace=True)   #.dropna(axis=0)删除所有有缺失值的行，.dropna(axis=1)删除所有有缺失值的列,inplace为True表示在原数据集上进行修改，为False表示生成一个复制对象不修改原数据，默认False
+
+
+###################################编码与哑变量#####################################
+####################### 编码，将文字型数据转换为数值型###############################
+# preprocessing.LabelEncoder：标签专用，能够将分类转换为分类数值
+from sklearn.preprocessing import LabelEncoder
+y = data.iloc[:,-1]   #要输入的是标签，不是特征矩阵，所以允许一维
+le = LabelEncoder()
+label = le.fit_transform(y)
+# print(le.classes_)   #.classes_查看标签中究竟有多少类别
+data.iloc[:,-1] = label
+# print(data.head())
+
+# preprocessing.OrdinalEncoder：特征专用，能够将分类特征转换为分类数值
+# 将特征值转为数字
+from sklearn.preprocessing import OrdinalEncoder
+data2 = data.iloc[:,1:-1]  #从第一列取到倒数第二列
+le2 = OrdinalEncoder()
+data2_ = le2.fit_transform(data2)
+# print(le2.categories_)
+data.iloc[:,1:-1] = data2_
+print(data.head())
+
+#####################################哑变量####################################
+# 数据可能是相互独立（名义变量）、不完全独立（有序变量）、相互联系（有距变量）的，直接转换为0,1,2并不准确，忽略了数字中自带的数学性质，会影响建模，因此名义变量需要用哑变量的方式处理
+# 哑变量：能够让算法知道数据的取值是没有可计算性质的，使用独热编码来转换
+from sklearn.preprocessing import OneHotEncoder
+X = data.iloc[:,1:-1]
+ohe = OneHotEncoder(categories='auto')
+result = ohe.fit_transform(X).toarray()
+# print(result)   #结果有五列，一共有几种标签结果就是几列
+# print(pd.DataFrame(ohe.inverse_transform(result)))   #进行还原
+# print(ohe.get_feature_names())   #查看每一列代表什么
+
+newdata = pd.concat([data,pd.DataFrame(result)],axis=1)  #将数据与特征转换后的表横向相连
+newdata.drop(["Sex","Embarked"],axis=1,inplace=True)   #删除原数据中的Sex和Embarked列,inplace=True不创建新的对象，直接对原始对象进行修改
+newdata.columns = ["Age","Survived","Female","Male","Embarked_C","Embarked_Q","Embarked_S"]
+# print(newdata.head())
+# sklearn.preprocessing.LabelBinarizer可以对标签做哑变量，只能做二分类
+
+#############################二值化与分箱#######################
+# 二值化：将特征值设为0/1（preprocessing.Binarizer ）
+# from sklearn.preprocessing import Binarizer
+# # data3 = data.iloc[:,0].values.reshape(-1,1)   #用.values提取值再转为二维的
+# # br = Binarizer(threshold=30)   #以30为界限，以下为0，以上为1
+# # result = br.fit_transform(data3)
+# # print(result.head())
+
+# 分箱：将连续型变量划分为分类变量，能够将连续型变量排序后按顺序分箱后编码（preprocessing.KBinsDiscretizer）
+# 三个重要参数：
+# 1.n_bins：每个特征中分箱的个数，每一列必须一样，默认5
+# 2.encode：编码的方式，1）onehot做哑变量返回稀疏矩阵，每一列是一个特征中的一个类别；2）ordinal每个特征的每个箱都被编码为一个整数，返回每一列是一个特征，每个特征下含 有不同整数编码的箱的矩阵；3）onehot-dense做哑变量返回密集数组
+# 3.strategy：定义箱宽，默认quantile，uniform等宽分箱，quantile等位分箱，kmeans按聚类分箱
+from sklearn.preprocessing import KBinsDiscretizer
+data3 = data.iloc[:,0].values.reshape(-1,1)
+kbd1 = KBinsDiscretizer(n_bins=3, encode='ordinal', strategy='uniform')  #按照年龄的排序分三箱
+result1 = kbd1.fit_transform(data3)
+# print(set(result1.ravel()))  #ravel()返回的是一个数组的视图，和flatten（）效果一样，set（）是把数据放到一个集合里
+kbd2 = KBinsDiscretizer(n_bins=3, encode='onehot', strategy='uniform')
+result2 = kbd2.fit_transform(data3).toarray()
+print(result2)   #变为哑变量了，结果返回三列
