@@ -1,0 +1,174 @@
+# 随机森林的剑魔基本流程和单个决策树一致，只是模块名称不同，重要参数也一致
+#  随机森林的特有参数：n_estimators：森林中树木的数量，即基评估器的数量，n_estimators 越大，模型的效果往往越好，应在训练难度和模型效果之间取得平衡
+############# 重要属性和接口###########
+# 属性：
+# 1）.estimators_：查看随机森林中所有树的列表，可以看到每一颗决策树立的参数是什么样的，没颗决策树长得什么样子
+# 2）.oob_score_：指的是袋外得分，用袋外数据测试模型，本质还是测试模型的精确度
+# 3）.feature_importances_：和决策树中的用法一样
+# 接口：
+# apply, ﬁt, predict和score四个和决策树中的用法一样
+# predict_proba：返回每个测试样本对应的被分到每一类标签的概率，标签有几个就返回几个概率，如果是二分类问题则返回数值大于0.5被分为1，小于0.5被分为0
+
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+
+wine = load_wine()  #导入红酒数据
+Xtrain,Xtest,Ytrain,Ytest = train_test_split(wine.data,wine.target,test_size=0.3)  #分测试集和训练集
+# 实例化决策树模型和随机森林模型
+ clf = DecisionTreeClassifier(random_state=0)
+ rfc = RandomForestClassifier(random_state=0)
+# 导入训练集和测试集
+ clf = clf.fit(Xtrain,Ytrain)
+ rfc = rfc.fit(Xtrain,Ytrain)
+# 准确度预测
+ score_c = clf.score(Xtest,Ytest)
+ score_r = rfc.score(Xtest,Ytest)
+# 查看准确度
+ print("决策树:{}".format(score_c),"随机森林:{}".format(score_r))
+
+# 相同模型下的决策树和随机森林进行交叉验证
+from sklearn.model_selection import cross_val_score
+
+# 进行十次交叉验证
+ clf = DecisionTreeClassifier()
+ clf_s = cross_val_score(clf,wine.data,wine.target,cv=10)
+ rfc = RandomForestClassifier(n_estimators=25)
+ rfc_s = cross_val_score(rfc,wine.data,wine.target,cv=10)
+ plt.plot(range(1,11),clf_s,label = "DecisionTree")
+ plt.plot(range(1,11),rfc_s,label = "RandomForest")
+ plt.legend()
+# plt.show()
+
+# 循环十次，每次进行十次交叉验证
+ clf_l = []
+ rfc_l = []
+ for i in range(10):
+     clf = DecisionTreeClassifier()
+     clf_s = cross_val_score(clf,wine.data,wine.target,cv=10).mean()
+     clf_l.append(clf_s)
+     rfc = RandomForestClassifier(n_estimators=25)
+     rfc_s = cross_val_score(rfc,wine.data,wine.target,cv=10).mean()
+     rfc_l.append(rfc_s)
+ plt.plot(range(1,11),clf_l,label = "DecisionTree")
+ plt.plot(range(1,11),rfc_l,label = "RandomForest")
+ plt.legend()
+ plt.show()
+# 可以看到单个决策树和随机森林的变化趋势基本一致，因为bagging算法取平均值，单个决策树的准确率越高，随机森林的准确率也会越高
+
+# n_estimators的学习曲线，用法和决策树的max_depth一致
+superpa = []
+for i in range(200):
+    rfc = RandomForestClassifier(n_estimators=i + 1,n_jobs=-1)
+    rfc_s = cross_val_score(rfc,wine.data,wine.target,cv=10).mean()
+    superpa.append(rfc_s)
+rfc_s_max = max(superpa)
+n = superpa.index(max(superpa))
+print(rfc_s_max,n)
+plt.plot(range(1,201),superpa,label = "n_estimators")
+plt.show()
+
+################################## 模型调参说明（对模型复杂度的影响程度递减）######################################
+# n_estimators：调大模型精确度逐渐会平稳，不会影响单个模型的复杂福
+# max_depth：调参时模型精确度有增有减，默认最大深度即最高复杂度， max_depth↓模型更简单，且向图像的左边移动
+# min_samples_leaf: 调参时模型精确度有增有减，默认最小限制1即最高复杂度，min_samples_leaf↑模型更简单，且向图像的左边移
+# min_samples_split: 调参时模型精确度有增有减，默认最小限制2即最高复杂度，min_samples_split↑，模型更简单，且向图像的左边移动
+# max_features：调参时模型精确度有增有减，默认auto是特征总数的开平方，位于中间复杂度，max_features↓，模型更简单，图像左移 ，max_features↑，模型更复杂，图像右移
+# criterion：有增有减，一般使用gini
+##################################################################################################################
+
+from sklearn.datasets import load_breast_cancer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV  #模型选择中的网格搜索
+from sklearn.model_selection import cross_val_score
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+###################网格搜索参数设置#######################
+# param_grid = {'n_estimators':np.arange(0, 200, 10)}
+# param_grid = {'max_depth':np.arange(1, 20, 1)}
+# param_grid = {'criterion':['gini', 'entropy']}
+# param_grid = {'min_samples_split':np.arange(2, 2+20, 1)}
+# param_grid = {'min_samples_leaf':np.arange(1, 1+10, 1)}
+# param_grid = {'max_features':np.arange(5,30,1)}
+#########################################################
+
+
+data = load_breast_cancer()
+rfc = RandomForestClassifier(n_estimators=100,random_state=90)
+score_pre = cross_val_score(rfc,data.data,data.target,cv=10).mean()
+# print(score_pre)
+
+# n_estimators的学习曲线
+scorel = []
+#第一次先取每十个数作为一个阶段来观察n_estimators的变化如何引起模型整体准确率的变化
+for i in range(0, 200, 10):  #最小值为1，一共20
+    rfc = RandomForestClassifier(n_estimators=i + 1,n_jobs = -1,random_state = 90)
+    score = cross_val_score(rfc, data.data, data.target, cv=10).mean()
+    scorel.append(score)
+print(max(scorel), (scorel.index(max(scorel)) * 10) + 1)   # 每十个建一次模，索引号为10*n+1
+plt.figure(figsize=[20, 5])
+plt.plot(range(1, 201, 10), scorel)
+plt.show()
+
+# 结果峰值出现在71，进一步确定范围（65,75）再次绘制学习曲线，确定最终结果
+for i in range(65,75):
+    rfc = RandomForestClassifier(n_estimators=i + 1,n_jobs = -1,random_state = 90)
+    score = cross_val_score(rfc, data.data, data.target, cv=10).mean()
+    scorel.append(score)
+print(max(scorel), [*range(65,75)][scorel.index(max(scorel))])
+plt.figure(figsize=[20, 5])
+plt.plot(range(65,75), scorel)
+plt.show()   #得到结果:0.9666353383458647 72
+
+#使用网格搜索对参数一个一个调整
+# 使用网格搜索会将各个参数可能的取值进行排列组合，列出所有可能的组合结果生成“网格”并用于SVM训练，用交叉验证进行评估，返回一个合适的分类器，自动调整至最佳参数组合，可以通过clf.best_params_获得参数值
+#调整max_depth
+param_grid = {'max_depth':np.arange(1,20,1)}  #数据比较小，采用1-20的深度，数据大可尝试30-50
+rfc = RandomForestClassifier(n_estimators=72,random_state=90)
+GS = GridSearchCV(rfc,param_grid,cv=10)
+GS.fit(data.data,data.target)
+print(GS.best_params_)
+print(GS.best_score_)
+# 结果：{'max_depth': 8} 0.9683897243107771
+# 如果准确度升高则把得到的最佳参数值代入继续进行其他参数调试，调整以后准确度反而降低说明图像向左移了，可能n_estimators的调整已经达到了最佳效果，继续江地模型复杂度反而使模型欠拟合，泛误差增大了，此时需要增大模型复杂度，只能调max_features，则继续对max_features进行网格搜索
+
+# 调整min_samples_leaf
+param_grid = {'min_samples_leaf':np.arange(1,11,1)}
+rfc = RandomForestClassifier(n_estimators=72,max_depth=8,random_state=90)
+GS = GridSearchCV(rfc,param_grid,cv=10)
+GS.fit(data.data,data.target)
+print(GS.best_params_)
+print(GS.best_score_)
+# 结果：{'min_samples_leaf': 1} 0.9683897243107771  说明参数的默认值1已经是最佳的
+
+# 调整min_samples_split
+param_grid = {'min_samples_split':np.arange(2,22,1)}
+rfc = RandomForestClassifier(n_estimators=72,max_depth=8,random_state=90)
+GS = GridSearchCV(rfc,param_grid,cv=10)
+GS.fit(data.data,data.target)
+print(GS.best_params_)
+print(GS.best_score_)
+# 结果：{'min_samples_split': 2} 0.9683897243107771  说明参数的默认值2已经是最佳的
+
+# 调整max_features
+param_grid = {'max_features':np.arange(5,30,1)}
+rfc = RandomForestClassifier(n_estimators=72,max_depth=8,random_state=90)
+GS = GridSearchCV(rfc,param_grid,cv=10)
+GS.fit(data.data,data.target)
+print(GS.best_params_)
+print(GS.best_score_)
+# 结果：{'max_features': 22} 0.968421052631579  准确度升高
+
+# 最后试一下criterion
+param_grid = {'criterion':['gini','entropy']}
+rfc = RandomForestClassifier(n_estimators=72,max_depth=8,max_features=22,random_state=90)
+GS = GridSearchCV(rfc,param_grid,cv=10)
+GS.fit(data.data,data.target)
+print(GS.best_params_)
+print(GS.best_score_)
+# 结果：{'criterion': 'gini'} 0.968421052631579  准确度未变，仍使用gini
+# 因此最佳参数组合为：n_estimators=72，max_depth=8，min_samples_leaf=1，min_samples_split=2，max_features=22，ceiterion=“gini”
