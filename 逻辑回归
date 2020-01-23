@@ -1,0 +1,74 @@
+# Sigmoid函数：一个S型的函数，当自变量z趋近正无穷时，因变量g(z)趋近于1，而当z趋近负无穷时，g(z)趋近 于0，它能够将任何实数映射到(0,1)区间，使其可用于将任意值函数转换为更适合二分类的函数，可用来进行归一化，同MinMaxScaler
+# 逻辑回归：即对数几率回归，其数学目的是求解能够让模型最优化的参数 的值，并基于参数和特征矩阵计算出逻辑回归的结果 y(x)
+# 逻辑回归的必要性：线性回归对数据要求很严格（如标签必须满足正态分布，特征之间的多重共线性需要消除等）但现实中很多真实情景的数据无法满足这些要求，因此线性回归应用效果有限；而逻辑回归由线性回归变化而来，分类效力强且不需对数据做任预处理
+# 逻辑回归优点：1）对线性关系的拟合效果很好（线性数据）2）计算效率高3）返回的分类结果不是固定的0，1，而是以小数形式呈现的类概率数字
+# 相关的类：
+# 1.linear_model.LogisticRegression：逻辑回归回归分类器（又叫logit回归，大熵分类器）
+# 2.linear_model.LogisticRegressionCV ：带交叉验证的逻辑回归分类器
+# 3.linear_model.logistic_regression_path ：计算Logistic回归模型以获得正则化参数的列表，相当用来调参的
+# 4.linear_model.SGDClassiﬁer ：利用梯度下降求解的线性分类器（SVM，逻辑回归等等）
+# 5.linear_model.SGDRegressor ：利用梯度下降小化正则化后的损失函数的线性回归模型
+# 6.metrics.log_loss ：对数损失，又称逻辑损失或交叉熵损失
+
+# 损失函数：逻辑函数需要基于训练数据求解参数θ，损失函数是衡量参数 的优劣的评估指标，用来求解优参数，（损失函数小——模型在训练集上表现优异，拟合充分，参数优秀 ）——最大似然法推到
+# 正则化：防止模型过拟合的过程，有L1正则化和L2正则化两种，分别通过在损失函数后加上参数向量的L1范式和L2范式的倍数来实现，即“正则项”/"惩罚项"。（L1范数表现为每个参数的绝对值之和，L2范数表现每个参数的平方和的开方）；4）抗造能力强，在小数据上表现能力很好
+# 重要参数：1）penalty：选择正则化方式（选择l1或l2，默认l2）；2）C：正则化强度的倒数，必须是一个大于0的浮点数，默认1.0即一倍正则项
+# 当正则化强度逐渐增大（即C逐渐变小）参数值会逐渐变小，但L1正则化会将参数压缩为0，L2正则化只会让参数尽量小，不会取到0
+
+
+# 建立两个逻辑回归
+from sklearn.linear_model import LogisticRegression as LR
+from sklearn.datasets import load_breast_cancer
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score   #模型评估指标，评定精确度
+
+dataset = load_breast_cancer()
+data = dataset.data
+target = dataset.target
+# print(data)
+# print(data.shape)
+# 实例化逻辑回归的模型（分别用l1、l2正则化
+lrl1 = LR(penalty="l1", solver="liblinear", C=0.5, max_iter=1000)
+lrl2 = LR(penalty="l2", solver="liblinear", C=0.5, max_iter=1000)
+
+lrl1 = lrl1.fit(data,target)
+# print(lrl1.coef_)  #逻辑回归的重要属性：coef_，查看每个特征所对应的参数，调用返回θ（拟合的）
+# print(lrl1.coef_ != 0)   #会返回一个布尔数组
+# print((lrl1.coef_ != 0).sum(axis = 1))  #结果：[10]，有十个结果不为0，说明有十个特征被留了下来
+
+lrl2 = lrl2.fit(data,target)
+# print(lrl2.coef_ )    #结果有非常接近0的但是都不为0
+# print((lrl2.coef_ != 0).sum(axis = 1))   #结果：[30]
+
+###################C的学习曲线########################
+l1 = []   #l1的训练集
+l2 = []
+l1test = []  #l1的测试集
+l2test = []
+Xtrain, Xtest, Ytrain, Ytest = train_test_split(data, target, test_size=0.3, random_state=420)
+for i in np.linspace(0.05,1,19):  #从0.05到1取出19个数字
+    lrl1 = LR(penalty="l1", solver="liblinear", C=i, max_iter=1000)
+    lrl2 = LR(penalty="l2", solver="liblinear", C=i, max_iter=1000)
+
+    lrl1 = lrl1.fit(Xtrain,Ytrain)
+    l1.append(accuracy_score(lrl1.predict(Xtrain), Ytrain))
+    l1test.append(accuracy_score(lrl1.predict(Xtest), Ytest))
+    #.predict返回对应的逻辑回归的结果，输入训练集的矩阵则返回训练集的预测数，输入测试集的矩阵则返回测试集的预测数
+    #accuracy_score：输入两个参数——模型的预测值和真实值，返回两者的差异的一个精确度，和accuracy_score(Xtest, Ytest)一样
+
+    lrl2 = lrl2.fit(Xtrain,Ytrain)
+    l2.append(accuracy_score(lrl2.predict(Xtrain), Ytrain))
+    l2test.append(accuracy_score(lrl2.predict(Xtest), Ytest))
+
+graph = [l1,l2,l1test,l2test]
+color = ["r","g","b","gray"]
+label = ["l1","l2","l1test","l2test"]
+plt.figure()
+for i in range(len(graph)):
+    plt.plot(np.linspace(0.05,1,19),graph[i],c = color[i],label = label[i])
+plt.legend(loc = 4)  #图例的位置放在右下角
+plt.show()
+# 可以看出横坐标是C，随着C越来越大，惩罚程度越来越小，模型拟合度越来越高，对于测试集，当C取0.5时l1精确度就不再变化了，l2还有波动直到C取0.8或0.9开始下降，因此C最好取0.8左右，否则过拟合会越来越严重
+
