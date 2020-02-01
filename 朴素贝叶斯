@@ -1,0 +1,35 @@
+# 算法得出的结论，永远不是100%确定的，更多的是判断出了一种“样本的标签更可能是某类的可能性”，而非一种“确定”。
+# 朴素贝叶斯：是一种直接衡量标签和特征之间的概率关系的有监督算法，它既可以做回归也可以分类（更多用于分类）
+# 贝叶斯算法根源理论：P(Y|X)*P(X)=P(X|Y)*P(Y)
+# 后验概率：知道了条件再去求解结果
+# 先验概率：完全没有任何条件限制时求解结果
+# 朴素贝叶斯被称为朴素的理由：假设特征之间是有条件独立的，可以解决众多问题，也简化了很多计算过程——因此，贝叶斯在特征之间有较多相关性的数据集上表现不佳
+# 朴素贝叶斯是一个有监督、不建模的算法，最常见的运用：文档分类和垃圾邮件过滤
+
+# sklearn中的朴素贝叶斯
+# 高斯朴素贝叶斯：通过假设P(Xi|Y)是服从高斯分布（也就是正态分布），来估计每个特征下每个类别上的条件概率
+# 主要参数：1）prior：表示类的先验概率。如果指定则不根据数据调整先验，如果不指定则自行根据数据计算先验概率P(Y)；2）var_smoothing:在估计方差时为了追求估计的稳定性将所有特征的方差中最大的方差以某个比例添加到估计的方差中。这个比例由var_smoothing参数控制(默认1e-9)
+
+import numpy as np
+from sklearn.naive_bayes import GaussianNB
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+
+digist = load_digits()
+data,labels = digist.data,digist.target
+Xtrain,Xtest,Ytrain,Ytest = train_test_split(data,labels,test_size=0.3,random_state=420)
+
+gnb = GaussianNB().fit(Xtrain,Ytrain)
+acc_score = gnb.score(Xtest,Ytest)   #查看精确度
+Y_pred = gnb.predict(Xtest)    #查看预测结果
+prob = gnb.predict_proba(Xtest)    #查看预测的概率结果，计算了每个样本十个标签下的概率
+# print(acc_score)     #结果：0.8592592592592593
+# print(Y_pred)
+# print(prob)
+# print(prob.shape)   #结果：(540, 10)
+
+# 使用混淆矩阵查看贝叶斯的分类结果
+from sklearn.metrics import confusion_matrix as CM
+cm = CM(Ytest,Y_pred)    #真实值在前，预测值在后，顺序不能变
+print(cm)
+# 混淆矩阵每一列代表了预测类别，每一列的总数表示预测为该类别的数据的数目；每一行代表了数据的真实归属类别，每一行的数据总数表示该类别的数据实例的数目。每一列中的数值表示真实数据被预测为该类的数目
