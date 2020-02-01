@@ -1,0 +1,195 @@
+# 聚类与分类
+# 1.聚类将数据分成多个组后探索数据之间是否有联系，分类按照已有标准对数据进行分组
+# 2.聚类属于无监督学习，无需标签训练；分类属于有监督学习，需要标签进行训练
+# 3.聚类结果不确定，不应定能反映数据的真实分类；分类结果确定，优劣是客观的
+
+# sklearn中聚类算法的两种形式：1）类：需要实例化和训练；2）函数：只需输入特征矩阵和超参数即可返回结果
+
+# KMeans算法：根据我们设定好的K，找出K个最优的质心，并将离这些质心最近的数据分别分配到这些质心代表的簇中去。
+# KMeans算法过程：1）随机抽取K个样本作为最初的质心；2）开始循环；3）将每个样本点分配到离他们最近的质心生成K个簇；4）对于每个簇计算所有被分到该簇的样本点的平均值作为新的质心；5）当质心的位置不再发生变化，迭代停止，聚类完成
+# 质心的位置不再变化的标志：在每次迭代中被分配到某个质心上的样本都是一致的，即每次新生成的簇都是一致的，所有的样本点都不会再从一个簇转移到另一个簇
+# 聚类的性质：追求簇内差异小，簇外差异大，对于一个簇所有样本点到质心的距离之和越小则簇中的样本越相似，簇内差异就越小
+# 簇内平方和（Inertia）：一个簇中所有样本点到质心的距离的平方和；整体平方和（total inertia）：将一个数据集中的所有簇的簇内平方和相加
+# KMeans的目标：求解能够让Inertia最小化的质心
+# 质心与距离的组合：欧几里得距离与均值、曼哈顿距离与中位数、余弦距离与均值
+# 重要参数：n_clusters:模型要分的类别的数量，唯一一个必填参数（默认为8）
+
+from sklearn.datasets import make_blobs   #用来自己创建数据集，制造成堆的数据
+import matplotlib.pyplot as plt
+import pandas as pd
+from sklearn.cluster import KMeans
+
+# 自己创建数据集
+data, label = make_blobs(n_samples=500,n_features=2,centers=4,random_state=1)   #创建500个点，两个特征，所创建的为随机数字
+fig1,ax1 = plt.subplots(1)  #参数为1表示只要一个子图，只返回一个画布和一个图像
+ax1.scatter(data[:,0],data[:,1],marker='o',s=8,c='r')    #横坐标为第0列的所有数据，纵坐标为第1列的所有数据
+# plt.show()
+
+# 根据label的种类数量分类
+colors = ["r","g","b","pink"]
+fig1,ax1 = plt.subplots(1)
+for i in range(4):
+    ax1.scatter(data[label==i,0],data[label==i,1],marker='o',s=8,c=colors[i])
+# # plt.show()
+
+# 使用Kmeans聚类
+n_clusters = 3
+cluster = KMeans(n_clusters=n_clusters, random_state=0).fit(data)   #实例化并进行训练
+label_pred = cluster.labels_    #重要属性.labels_查看聚好的类
+pred = cluster.fit_predict(data)    # KMeans因为不需要建立模型和预测结果，只需要fit就能得到聚类结果;.fit_predict表示学习数据data并对其进行预测，结果和fit后调用labels_一样
+# print(pred==label_pred)    #检查两种结果是否相等
+centroid = cluster.cluster_centers_     #属性cluster_centers_查看质心
+# print(centroid.shape)    #结果：(3, 2)  表示有三个点，每个点有两个特征
+inertia = cluster.inertia_   #属性inertia_查看总平方和
+# print(inertia)
+
+# 根据聚类结果画图
+colors = ["r","g","b","pink"]
+fig2,ax2 = plt.subplots(1)
+
+for i in range(n_clusters):
+    ax2.scatter(data[label_pred==i,0],data[label_pred==i,1],marker='o',s=8,c=colors[i])    #画出聚类后三个簇的点图
+    ax2.scatter(centroid[:,0],centroid[:,1],marker='x',s=15,c="black")    #画出三个质心的点图
+# plt.show()
+
+#尝试将n_clusters设为4
+n_clusters = 4
+cluster = KMeans(n_clusters=n_clusters, random_state=0).fit(data)
+inertia = cluster.inertia_
+# print(inertia)
+
+# 用inertia来作为衡量聚类结果好坏的指标的缺点：
+# 1.它不是有界的，难以确定；2.计算容易受到特征树木的影响，不适合一次次评估；3.它假设数据满足凸分布，会让数据在一些不规则形状的情况下表现不佳
+# 用轮廓系数来作为指标：能够同时衡量样本与其所在的簇中的其他样本的相似度a和与其他簇中的样本的相似度b，s=（b-a）/max（a，b）
+# 轮廓系数范围是(-1,1)，其中值越接近1表示样本与自己所在的簇中的样本很相似，并且与其他簇中的样 本不相似，当样本点与簇外的样本更相似的时候，轮廓系数就为负。当轮廓系数为0时，则代表两个簇中的样本相 似度一致，两个簇本应该是一个簇
+# 一个簇中的大多数样本具有比较高的轮廓系数，则簇会有较高的总轮廓系数，则整个数据集的平均轮廓系数越高，则聚类是合适的。如果许多样本点具有低轮廓系数甚至负值，则聚类是不合适的，聚类的超参数K可能设定得太大或者太小
+
+from sklearn.metrics import silhouette_samples     #参数与轮廓系数的一致，返回的是每个样本字迹的轮廓系数
+from sklearn.metrics import silhouette_score   #计算轮廓系数，返回一个数据集中所有样本轮廓系数的均值，两个参数：特征矩阵和聚好的类
+
+score1 = silhouette_score(data,label_pred)    #分三个簇
+# print(score1)    #结果：0.5882004012129721
+score2 = silhouette_score(data,cluster.labels_)    #分四个簇
+# print(score2)    #结果：0.6505186632729437，说明分四类的效果比分三类要好
+sample1 = silhouette_samples(data,label_pred)
+# print(sample1)   #结果有个别负值
+sample2 = silhouette_samples(data,cluster.labels_)
+print(sample2)     #结果基本没有负值
+
+# 轮廓系数的优点：
+# 1.它在有限空间中取值，使得我们对模型的聚类效果有一个“参考”；2.数对数据的分布没有假设，因此在很多数据集上都表现良好
+# 轮廓系数的缺陷：它在凸型的类上表现会虚高，比如基于密度进行的聚类，或通过DBSCAN获得的聚类结果，如果使用轮廓系数来衡量，则会表现出比真实聚类效果更高的分数。
+
+
+#######################################聚类算法案例_基于轮廓系数选择n_clusters##########################################################
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_samples,silhouette_score
+from sklearn.datasets import make_blobs
+
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import numpy as np
+
+data, label = make_blobs(n_samples=500,n_features=2,centers=4,random_state=1)
+
+n_clusters = 4
+fig,(ax1,ax2) = plt.subplots(1,2)    #创建一个画布，画布上有一行两列两个子图
+ax1.set_xlim([-0.1,1])    #横坐标为轮廓系数，取值-1到1，但是我们需要大于零的，这里只取-0.1到1来进行可视化
+ax1.set_ylim([0,data.shape[0] + (n_clusters + 1) * 10])     #纵坐标取值应该以样本数量为准即0到data.shape[0]，此处加上一个距离是使不同簇的图像之间有一个间隙
+
+# 开始建模，调用聚类好的标签
+cluster = KMeans(n_clusters=n_clusters,random_state=10).fit(data)    #实例化并训练
+label_pred = cluster.labels_
+
+# 调用轮廓系数分数，查看当前轮廓系数
+silhouette_avg = silhouette_score(data,label_pred)
+# print("当所分簇的数量为：",n_clusters,"整体轮廓系数的分数为：",silhouette_avg)
+silhouette_sample = silhouette_samples(data,label_pred)    #返回的是每个样本点的轮廓系数，即横坐标
+
+y_lower = 10   #设定纵坐标初始值
+
+# 开始对每一个簇进行循环
+for i in range(n_clusters):
+    # 抽取第i个簇的轮廓系数并进行排序
+    ith_silhouette = silhouette_sample[label_pred == i]
+    ith_silhouette.sort()   #.sort（）会直接改掉原数据的顺序
+    size_cluster_i = ith_silhouette.shape[0]    #返回这一个簇中的样本数量
+    y_upper = y_lower + size_cluster_i    #设置这一个簇纵坐标的最大取值
+    color = cm.nipy_spectral(float(i)/n_clusters)    #给每一个簇设置不同的颜色，colormap库nipy_spectral中一个小数代表一个颜色
+    ax1.fill_betweenx(np.arange(y_lower,y_upper),ith_silhouette,alpha=0.7)    #fill_between是填充曲线与直角之间的空间的函数，betweenx直角在纵坐标，参数输入横坐标、纵坐标、颜色
+    ax1.text(-0.05,y_lower + 0.5 * size_cluster_i,str(i))    #为每个簇写上编号并显示在条形图的中间位置
+    y_lower = y_upper + 10    #设置下一个簇开始的位置与上一个簇间隙为10
+# 给图1加上标题和坐标轴标签
+ax1.set_title("The silhouette plot for the various clusters.")
+ax1.set_xlabel("The silhouette coefficient values")
+ax1.set_ylabel("Cluster label")
+# 把轮廓系数的均值以虚线的形式放入图中
+ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
+# 设置坐标轴的刻度
+ax1.set_yticks([])
+ax1.set_xticks([-0.1,0,0.2,0.4,0.6,0.8,1])
+# 处理第二个子图
+# 获取新的颜色，此处没有循环，因此一次生成多个小数获取多个颜色
+colors = cm.nipy_spectral(label_pred.astype(float) / n_clusters)
+ax2.scatter(data[:,0],data[:,1],marker='o',s=8,c=colors)
+# 把生成的质心放到图像中去
+centers = cluster.cluster_centers_
+ax2.scatter(centers[:,0],centers[:,1],marker='x',c="black",s=200,alpha=1)
+# 设置第二个子图的标题、坐标轴标签
+ax2.set_title("The visualization of the clustered data.")
+ax2.set_xlabel("Feature space for the 1st feature")
+ax2.set_ylabel("Feature space for the 2nd feature")
+# 设置整个图的标题
+plt.suptitle(("Silhouette analysis for KMeans clustering on sample data ""with n_clusters = %d" % n_clusters),fontsize=14,fontweight='bold')
+plt.show()
+
+
+################################将上述过程包装成一个循环##############################
+for n_clusters in [2,3,4,5,6,7]:
+    n_clusters = n_clusters
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    ax1.set_xlim([-0.1, 1])
+    ax1.set_ylim([0, data.shape[0] + (n_clusters + 1) * 10])
+
+    cluster = KMeans(n_clusters=n_clusters, random_state=10).fit(data)
+    label_pred = cluster.labels_
+
+    silhouette_avg = silhouette_score(data, label_pred)
+    silhouette_sample = silhouette_samples(data, label_pred)
+
+    y_lower = 10
+
+    for i in range(n_clusters):
+        ith_silhouette = silhouette_sample[label_pred == i]
+        ith_silhouette.sort()  # .sort（）会直接改掉原数据的顺序
+        size_cluster_i = ith_silhouette.shape[0]  # 返回这一个簇中的样本数量
+        y_upper = y_lower + size_cluster_i  # 设置这一个簇纵坐标的最大取值
+        color = cm.nipy_spectral(float(i) / n_clusters)  # 给每一个簇设置不同的颜色，colormap库nipy_spectral中一个小数代表一个颜色
+        ax1.fill_betweenx(np.arange(y_lower, y_upper), ith_silhouette,
+                          alpha=0.7)  # fill_between是填充曲线与直角之间的空间的函数，betweenx直角在纵坐标，参数输入横坐标、纵坐标、颜色
+        ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))  # 为每个簇写上编号并显示在条形图的中间位置
+        y_lower = y_upper + 10  # 设置下一个簇开始的位置与上一个簇间隙为10
+    # 给图1加上标题和坐标轴标签
+    ax1.set_title("The silhouette plot for the various clusters.")
+    ax1.set_xlabel("The silhouette coefficient values")
+    ax1.set_ylabel("Cluster label")
+    # 把轮廓系数的均值以虚线的形式放入图中
+    ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
+    # 设置坐标轴的刻度
+    ax1.set_yticks([])
+    ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
+    # 处理第二个子图
+    # 获取新的颜色，此处没有循环，因此一次生成多个小数获取多个颜色
+    colors = cm.nipy_spectral(label_pred.astype(float) / n_clusters)
+    ax2.scatter(data[:, 0], data[:, 1], marker='o', s=8, c=colors)
+    # 把生成的质心放到图像中去
+    centers = cluster.cluster_centers_
+    ax2.scatter(centers[:, 0], centers[:, 1], marker='x', c="black", s=200, alpha=1)
+    # 设置第二个子图的标题、坐标轴标签
+    ax2.set_title("The visualization of the clustered data.")
+    ax2.set_xlabel("Feature space for the 1st feature")
+    ax2.set_ylabel("Feature space for the 2nd feature")
+    # 设置整个图的标题
+    plt.suptitle(("Silhouette analysis for KMeans clustering on sample data ""with n_clusters = %d" % n_clusters),
+                 fontsize=14, fontweight='bold')
+    plt.show()
