@@ -1,0 +1,231 @@
+# SVM(支持向量机/网络)功能包括有监督学习、无监督学习、半监督学习：
+# 1.有监督学习：线性二分类与多分类、非线性二分类与多分类、普通连续型变量的回归、概率型连续变量的回归
+# 2.无监督学习：支持向量聚类、异常值检测
+# 3.半监督学习：转导支持向量机
+
+
+# 从实际应用看：多被用于手写识别数字、人脸识别、文本和超文本的分类、图像的分类和图像分割系统、蛋白质分类、识别用于模型预测的各种特征
+# 从学术角度看：SVM是最接近深度学习的机器学习算法，线性SVM可以看成是神经网络的单个神经元，非线性的SVM则与两层的神经网络相当，非线性的SVM中如果添加多个核函数，则可以 模仿多层的神经网络
+
+# 支持向量机分类器：在数据空间中找出一个超平面作为决策边界，，利用这个决策边界来对数据进行分类，并使分类误差尽量小的模型）
+# 超平面：在几何中，超平面是一个空间的子空间，它是维度比所在空间小一维的空间；在二分类问题中，如果一个超平面能够将数据划分为两个集合，其中每个集合中包含单独的一个类别，我们就 说这个超平面是数据的“决策边界”。
+# 决策边界运动范围的宽度叫做这条决策边界的边际，拥有更大边际的决策边界在分类中的泛化误差更小
+
+# 核技巧：种能够使用数据原始空间中的向量计算来表示升维后的空间中的点积结果的数学方式
+# 核函数：原始空间中的点积函数
+# 使用核函数的优势：
+# 1.因为非线性SVM中的核函数都是正定核函数，确保了高维空间中任意两个向量的点积一定可以被低维空间中的这两个向量的某种计算来表示，所以不用担心核函数究竟是什么样，
+# 2.使用核函数计算低维度中的向量关系比计算原本点积更加简便
+# 3.因为计算是在原始空间中进行，所以避免了维度诅咒的问题。
+# 重要参数kernel：可选linear（线性核，处理线性问题）、poly（多项式核，处理偏线性问题）、sigmoid（双曲正切核，非线性）、rbf（高斯径向基，偏非线性）
+
+
+from sklearn.datasets import make_blobs
+from sklearn.svm import SVC
+import matplotlib.pyplot as plt
+import numpy as np
+
+############################################## 线性SVM决策过程的可视化##########################################
+# 实例化数据集
+data,labels = make_blobs(n_samples=50,centers=2,random_state=0,cluster_std=0.6)
+plt.scatter(data[:,0],data[:,1],c=labels,s=50,cmap="rainbow")
+plt.xticks([])
+plt.yticks([])
+# 定义画决策边界的函数
+ax = plt.gca()    #获取当前的子图，如果不存在则创建新的子图
+xlim = ax.get_xlim()
+ylim = ax.get_ylim()    #默认创建（0.0,1.0）范围内的横纵坐标
+# 创建网格
+axisx = np.linspace(xlim[0],xlim[1],30)
+axisy = np.linspace(ylim[0],ylim[1],30)
+axisy,axisx = np.meshgrid(axisy,axisx)
+# 将特征向量转换为特征矩阵的函数，核心是将两个特征向量广播，以便获取y.shape * x.shape这么多个坐标点的横坐标和纵坐标
+xy = np.vstack([axisx.ravel(),axisy.ravel()]).T     #ravel（）降维，vstack能够将多个结构一致的一维数组按行堆叠起来
+
+a = np.array([1,2,3])
+b = np.array([7,8])
+v1,v2 = np.meshgrid(a,b)
+v = np.vstack([v1.ravel(),v2.ravel()]).T     #组合以后一共得到六个坐标
+
+# 建模，通过fit计算出对应的决策边界
+clf = SVC(kernel="linear").fit(data,labels)
+p = clf.decision_function(xy).reshape(axisx.shape)    #接口decision_function，返回每个输入的样本所对应的到决策边界的距离,然后再将这个距离转换为axisx的结构
+
+
+# 画决策边界和平行于决策边界的超平面
+ax.contour(axisx,axisy,p,colors="k",levels=[-1,0,1],alpha=0.5,linestyles=["--","--","--"])
+ax.set_xlim(xlim)
+ax.set_ylim(ylim)
+
+# 将上述过程包装成函数
+def plot_svc_decision_function(model,ax=None):
+    if ax is None:
+        ax = plt.gca()
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    x = np.linspace(xlim[0], xlim[1], 30)
+    y = np.linspace(ylim[0], ylim[1], 30)
+    Y, X = np.meshgrid(y, x)
+    xy = np.vstack([X.ravel(),Y.ravel()]).T
+    p = model.decision_function(xy).reshape(X.shape)
+
+    ax.contour(X,Y,p,colors="k",levels=[-1,0,1],alpha=0.5,linestyles=["--","--","--"])
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    # plt.show()
+
+# 则整个过程可以写作：
+clf = SVC(kernel="linear").fit(data,labels)
+plt.scatter(data[:,0],data[:,1],c=labels,s=50,cmap="rainbow")
+plot_svc_decision_function(clf)
+
+# 目前的例子是根据线性可分的状况来说明的，如果数据是非线性不可分的，线性SVM则不适用，此时要在原本data和labels的基础上添加一个新维度
+# 定义一个由datar计算出来的新维度r
+r = np.exp(-(data**2).sum(1))
+rlim = np.linspace(min(r),max(r),0.2)
+
+from mpl_toolkits import mplot3d
+
+# 定义一个绘制三维图像的函数
+def plot_3D(elev=30,azim=30,X=data,Y=labels):    #elev表示上下旋转的角度 ,azim表示平行旋转的角度
+    ax = plt.subplot(projection = "3d")
+    ax.scatter3D(X[:,0],X[:,1],r,c=Y,s=50,cmap='rainbow')
+    ax.view_init(elev=elev,azim=azim)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("r")
+    plt.show()
+plot_3D()
+
+
+###################################################案例########################################################
+from sklearn.datasets import load_breast_cancer
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import numpy as np
+from time import time
+import datetime
+
+dataset = load_breast_cancer()
+data = dataset.data
+labels = dataset.target
+# print(data.shape)     #结果：(569, 30)  表明这是一个有569个对象，30个特征的数据
+# print(np.unique(labels))    #结果：[0 1]  返回labels中的唯一值
+# plt.scatter(data[:,0],data[:,1],c=labels)   #先拿两个特征尝试做可视化，大概看一下数据
+# plt.show()    #结果是交互的两类点集，偏线性
+
+Xtrain,Xtest,Ytrain,Ytest = train_test_split(data,labels,test_size=0.3,random_state=420)   #分测试集和训练集
+Kernrls = ["linear","poly","rbf","sigmoid"]
+for kernel in Kernrls:
+    time0 = time()     #time（）是时间戳，返回当前的时间点
+    clf = SVC(kernel=kernel,gamma="auto",degree=1,cache_size=5000).fit(Xtrain,Ytrain)   #degree默认为3，如果不设置模型则一直停留在线性核函数之后，因为poly核函数需要消耗大量的时间，运行缓慢
+    # print("The accuracy under kernel %s is %f" % (kernel, clf.score(Xtest, Ytest)))    #打印两个字符串，第一个是选取的核函数，第二个是在该核函数下模型的精确度
+    # print(datetime.datetime.fromtimestamp(time() - time0).strftime("%M:%S:%f"))     #time（）- time0获取当前和函数运行的时间，strftime("%M:%S:%f")将时间转换为了分秒的形式
+# 结果：
+# The accuracy under kernel linear is 0.929825   00:00:548777
+# The accuracy under kernel poly is 0.923977     00:00:104479
+# The accuracy under kernel rbf is 0.596491      00:00:048906
+# The accuracy under kernel sigmoid is 0.596491  00:00:004986
+# rbf在线性和非线性数据上都应该表现的很好，此时精确度却很低，可以考虑是数据的量纲的问题
+
+import pandas as pd
+data = pd.DataFrame(data)
+# 进行描述性统计，这个功能是在pandas下，只对DataFrame有用
+# print(data.describe([0.01,0.05,0.1,0.25,0.5,0.75,0.9,0.99]).T)  #查看数据在1%，5%，10%...的分布，会返回其均值、方差、最小值
+# 可以看到数据的均只相差很大，说明数据存在量纲不统一的问题，数据的分布是偏态的，因此需要使用用数据预处理中的标准化的类对数据进行标准化
+from sklearn.preprocessing import StandardScaler
+X = StandardScaler().fit_transform(data)
+data = pd.DataFrame(X)
+# print(data.describe([0.01,0.05,0.1,0.25,0.5,0.75,0.9,0.99]).T)
+# 标准化后均值都为接近0的数，方差均为1，数据不再存在量纲问题
+
+# 再次让SVC在核函数中遍历：
+Xtrain,Xtest,Ytrain,Ytest = train_test_split(X,labels,test_size=0.3,random_state=420)   #分测试集和训练集
+Kernrls = ["linear","poly","rbf","sigmoid"]
+for kernel in Kernrls:
+    time0 = time()     #time（）是时间戳，返回当前的时间点
+    clf = SVC(kernel=kernel,gamma="auto",degree=1,cache_size=5000).fit(Xtrain,Ytrain)   #degree默认为3，如果不设置模型则一直停留在线性核函数之后，因为poly核函数需要消耗大量的时间，运行缓慢
+    # print("The accuracy under kernel %s is %f" % (kernel, clf.score(Xtest, Ytest)))    #打印两个字符串，第一个是选取的核函数，第二个是在该核函数下模型的精确度
+    # print(datetime.datetime.fromtimestamp(time() - time0).strftime("%M:%S:%f"))
+# 结果：
+# The accuracy under kernel linear is 0.976608    00:00:009937
+# The accuracy under kernel poly is 0.964912      00:00:004988
+# The accuracy under kernel rbf is 0.970760       00:00:007977
+# The accuracy under kernel sigmoid is 0.953216   00:00:005074
+# 可以看到所有核函数的运算时间都大大地减少了尤其是对于线性核来说，rbf表现出了非常优秀的结果
+
+# 结论：
+# 1.线性核，尤其是多项式核函数在高次项时计算非常缓慢
+# 2.rbf和多项式核函数都不擅长处理量纲不统一的数据集
+
+###########################################核函数相关参数（gamma、degree、coef0）的选取###########################################################
+# degree：poly核函数的次数，如果没有选择poly则被忽略，默认3
+# gamma：核函数的系数，kernel不选linear时有效，输入auto则自动取1/n_features,输入scale则取1/（n_features * data.std()）,输入auto_deprecated表示没有传递明确的gamma值
+# coef0：和函数中的常数项，只在kernel为poly和sigmoid时有效，浮点数，默认0.0，可不填
+
+# 对于rbf只有gamma这一个参数可以调，可以画学习曲线来确定
+score = []
+gamma_range = np.logspace(-10,1,50)   #，对（-10，1）中的50个数取对数，返回在对数刻度上均匀间隔的数字
+for i in gamma_range:
+    clf = SVC(kernel="rbf",gamma=i,cache_size=5000).fit(Xtrain,Ytrain)
+    score.append(clf.score(Xtest,Ytest))
+
+# print(max(score),gamma_range[score.index(max(score))])  #返回最高的精确度和对应的gamma的取值  结果：0.9766081871345029 0.012067926406393264
+# plt.plot(gamma_range,score)
+# plt.show()
+
+# 对于poly核函数，有三个参数共同作用，因此使用网格搜索来进行调参
+from sklearn.model_selection import StratifiedShuffleSplit    #专门用来设置交叉验证的模式
+from sklearn.model_selection import GridSearchCV
+
+time0 = time()
+
+gamma_range = np.logspace(-1,10,20)
+coef0_range = np.linspace(0,5,10)
+param_grid = dict(gamma = gamma_range,coef0 = coef0_range)
+cv = StratifiedShuffleSplit(n_splits=5,test_size=0.3,random_state=420)    #把数据分成5份，一份作测试集，剩下作训练集
+grid = GridSearchCV(SVC(kernel="poly",degree=1,cache_size=5000),param_grid=param_grid,cv=cv)
+grid.fit(X,labels)
+
+# print("The best parameters are %s with a score of %0.5f" % (grid.best_params_, grid.best_score_))    #结果：The best parameters are {'coef0': 0.0, 'gamma': 0.1} with a score of 0.96842
+# print(datetime.datetime.fromtimestamp(time()-time0).strftime("%M:%S:%f"))    #结果：00:29:180976
+# 可以看到分数比调参之前略有提高但还是不如rbf
+
+
+##############################软间隔与重要参数c#####################################
+# 硬间隔与软间隔：当两组数据是完全线性可分，我们可以找出一个决策边界使得训练集上的分类误差为0，这两种数据就被称为 是存在”硬间隔“的。当两组
+# 对于软间隔数据来说，边际越大被分错的样本也就越多，因此需要找到一个”最大边际“与”被分错的样本数量“之间的平衡
+# 参数C:松弛系数的惩罚项系数，用于权衡”训练样本的正确 分类“与”决策函数的边际最大化“两个不可同时完成的目标
+# 如果C值设定比较大，那SVC可能会选择边际较小的，能够更好地分类所有训 练点的决策边界，不过模型的训练时间也会更长。如果C的设定值较小，那SVC会尽量最大化边界，决 策功能会更简单，但代价是训练的准确度
+# C为浮点数，默认1，大于等于0，可不填
+
+# 调线性核函数
+# score = []
+# C_range = np.linspace(0.01,30,50)
+# for i in C_range:
+#     clf = SVC(kernel="linear",C=i,cache_size=5000).fit(Xtrain,Ytrain)
+#     score.append(clf.score(Xtest,Ytest))
+# print(max(score),C_range[score.index(max(score))])  #结果：0.9766081871345029 1.2340816326530613
+# plt.plot(C_range,score)
+# plt.show()
+
+# 调rbf核函数
+# score = []
+# C_range = np.linspace(0.01,30,50)
+# for i in C_range:
+#     clf = SVC(kernel="rbf",C=i,gamma=0.18,cache_size=5000).fit(Xtrain,Ytrain)
+#     score.append(clf.score(Xtest,Ytest))
+# print(max(score),C_range[score.index(max(score))])  #结果：0.9473684210526315 3.070204081632653
+# plt.plot(C_range,score)
+# plt.show()
+
+# 进一步细化
+score = []
+C_range = np.linspace(5,7,50)
+for i in C_range:
+    clf = SVC(kernel="rbf",C=i,gamma=0.18,cache_size=5000).fit(Xtrain,Ytrain)
+    score.append(clf.score(Xtest,Ytest))
+print(max(score),C_range[score.index(max(score))])  #结果：0.9473684210526315 3.070204081632653
+plt.plot(C_range,score)
+plt.show()
