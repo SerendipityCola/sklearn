@@ -1,0 +1,102 @@
+# 感知机：最简单的支持向量机
+# 感知机的流程：特征数据输入后通过神经键输入神经元，每条神经键上对应不同的参数，与特征数据经由神经键匹配到参数向量，基于参数求解出决策边界，由决策函数sign（激活函数）进行判断，最后纵欲测出标签并输出结果
+# 三个核心：1）每个输入的特征会被匹配到一个参数；2）一个线性关系；3）一个激活函数
+# 神经网络相当于众多感知机的集成，因此确定激活函数并找出参数向量也是神经网络的计算核心
+
+# 神经网络（三层）的结构：
+# 第一层：输入层，永远只有一层，输入特征矩阵用，每个神经元上都是一个特征向量
+# 第二层：隐藏层，最少一层，位于输入层和输出层中间，用来让算法学习的网络层级，更靠近输入层的是上层，更靠近输出层的是下层，每个神经元中都存在一个激活函数，数据被逐层传递，每个下层的神经元都必须处理上层的神经元中的激活函数处理完毕的数据
+# 第三层：输出层，输出预测标签用，只有一层，如果是回归类一般只有一个神经元，回归的是所有输入样本的标签向量，如果是分类可能会有多个神经元，分别输出样本对应的每个标签分类下的概率
+
+# 计算的参数w：每条神经键上都有一个参数w，上标表示这个系数链接的下层的层数，下表第一个数字表示链接的下层神经元在下层的位置，第二个数字表示链接的上层神经元在上层的位置
+# 这一层的每个神经元上会有几个参数对应，是由上层有几个神经元确定的
+# 重点：1）神经网络的每一层的结果之间的关系是嵌套，不是迭代。2）每一个系数和每一层之间都是相互独立的
+
+# 涉及的问题：
+# 1.激活函数：如同核函数，有各种各样的激活函数可供选择
+# 2.神经网络的结构：隐藏层的层数，每层神经元的数量
+# 3.计算参数w、b的确定
+
+# sklearn中的神经网络的类：
+# 1.neural_network.BernoulliRBM:伯努利限制玻尔兹曼机器，一中随机递归神经网络
+# 2.neural_network.MLPClassifier:多层感知器分类器
+# 3.neural_network.MLPRegressor:多层感知器回归器
+
+# 隐藏层神经元的重要参数
+# hidden_layer_sizes：元组，长度为n_layers-2，默认100，元组中包含多少个元素就表示设定多少个隐藏层，元组中第i个元素表示第i个隐藏层中的神经元数量
+
+# 建立神经网络
+import numpy as np
+from sklearn.neural_network import MLPClassifier as DNN
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score as cv
+from sklearn.datasets import load_breast_cancer
+from sklearn.tree import DecisionTreeClassifier as DTC
+from sklearn.model_selection import train_test_split as TTS
+import matplotlib.pyplot as plt
+from time import time
+import datetime
+
+dataset = load_breast_cancer()
+data = dataset.data
+labels = dataset.target
+Xtrain,Xtest,Ytrain,Ytest = TTS(data,labels,test_size=0.3,random_state=420)
+
+# 建模，使用交叉验证导出分数
+time0 = time()
+dnn = DNN(hidden_layer_sizes=(100,),random_state=420)
+# print(cv(dnn,data,labels,cv=5).mean())   #结果：0.9402111473373699
+# print(time()-time0)    #结果：2.0156006813049316
+
+# 使用决策树进行对比
+time0 = time()
+clf = DTC(random_state=420)
+# print(cv(clf,data,labels,cv=5).mean())    #结果：0.9173420276354604
+# print(time()-time0)    #结果：0.0359044075012207
+
+# 查看如何使用参数hidden_layer_sizes
+dnn = DNN(hidden_layer_sizes=(100,),random_state=420).fit(Xtrain,Ytrain)
+# print(dnn.score(Xtest,Ytest))    #结果：0.9005847953216374
+# print(dnn.n_layers_)   #结果：3   默认层数就是3，说明隐藏层只有一层
+dnn = DNN(hidden_layer_sizes=(200,),random_state=420).fit(Xtrain,Ytrain)
+# print(dnn.score(Xtest,Ytest))    #结果：0.9181286549707602
+
+# 上面结果貌似提升了一点，来试着画一下学习曲线呗
+# s = []
+# for i in range(100,2000,100):
+#     dnn = DNN(hidden_layer_sizes=(int(i),),random_state=420).fit(Xtrain,Ytrain)
+#     s.append(dnn.score(Xtest,Ytest))
+# print(i,max(s))  #结果：1900 0.9298245614035088
+# plt.figure()
+# plt.plot(range(100,2000,100),s)
+# plt.show()  #图像上下波动
+
+# 试一下增加隐藏层的同时控制神经元的个数
+s = []
+layers = [(100,),(100,100),(100,100,100),(100,100,100,100),(100,100,100,100,100),(100,100,100,100,100,100)]
+
+for i in layers:
+    dnn = DNN(hidden_layer_sizes=(i),random_state=420).fit(Xtrain,Ytrain)
+    s.append(dnn.score(Xtest,Ytest))
+print(i,max(s))  #结果：(100, 100, 100, 100, 100, 100) 0.9122807017543859
+plt.figure()
+plt.plot(range(3,9),s)
+plt.xticks([3,4,5,6,7,8])
+plt.xlabel("Total number of layers")
+plt.show()
+
+# 那我们试试同时增加隐藏层和神经元个数
+s = []
+layers = [(100,),(150,150),(200,200,200),(300,300,300,300)]
+
+for i in layers:
+    dnn = DNN(hidden_layer_sizes=(i),random_state=420).fit(Xtrain,Ytrain)
+    s.append(dnn.score(Xtest,Ytest))
+print(i,max(s))  #结果：(300, 300, 300, 300) 0.9181286549707602
+plt.figure()
+plt.plot(range(3,7),s)
+plt.xticks([3,4,5,6])
+plt.xlabel("Total number of layers")
+plt.show()
+
+# 从学习曲线来看数据上的表现没有明显的提升或者下降
